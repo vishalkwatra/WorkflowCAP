@@ -1,0 +1,74 @@
+_schema-version: "3.1"
+ID: workflowdemo
+description: A simple CAP project.
+version: 1.0.0
+modules:
+- name: workflowdemo-srv
+  type: nodejs
+  path: gen/srv
+  requires: 
+  - name: uaa_workflowdemo
+  - name: wim_workflow
+  - name: wim_workflowd
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+  parameters:
+    buildpack: nodejs_buildpack
+  build-parameters:
+    builder: npm-ci
+- name: approvals
+  type: com.sap.application.content
+  path: app/approvals
+  requires:
+  - name: wim_workflow
+    parameters:
+      content-target: true
+- name: workflowdemo-approuter
+  type: approuter.nodejs
+  path: app
+  requires:
+  - name: workflowdemo_html_repo_runtime
+  - name: uaa_workflowdemo
+  - name: wim_workflow
+  - name: srv-api
+    properties:
+      name: srv-api
+      url: '~{srv-url}'
+      forwardAuthToken: true
+    group: destinations
+  parameters:
+    disk-quota: 256M
+    memory: 256M
+resources:
+- name: wim_workflowd
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: destination
+    service-plan: lite
+- name: wim_workflow
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: workflow
+    service-plan: lite
+- name: workflowdemo_html_repo_runtime
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-plan: app-runtime
+- name: uaa_workflowdemo
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: workflowdemo-xsuaa-service
+    service-plan: application
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+  - builder: custom
+    commands:
+    - npm ci
+    - npx -p @sap/cds-dk cds build --production
